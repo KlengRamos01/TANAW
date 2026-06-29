@@ -6,7 +6,7 @@ TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives 
 ## Core Features
 1. **Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a forecast in conversational Filipino/English. ✅
 2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — At-a-glance safety rating per destination per day. ✅
-3. **Alternative Destination Suggestions (Same Island Group, Better Forecast)** — Up to 3 nearby Green or Yellow-rated alternatives when a destination has Red/Yellow overall risk. ✅
+3. **Alternative Destination Suggestions (Same Island Group, Better Forecast)** — Up to 3 nearby Green or Yellow-rated alternatives when a destination has Red/Yellow overall risk. Each alternative shows its true risk color badge (green or yellow). ✅
 4. **Saved Trip Alerts with Risk-Change Notifications** — ❌ NOT INCLUDED IN V1
 5. **Data Source and Timestamp Disclosure on Every Forecast** — Transparent data provenance on all weather data shown. ✅
 
@@ -128,6 +128,13 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 - Returns 7-day forecast cards with plain-language summaries (via Gemini)
 - Three-tier risk badges: green (safe), yellow (caution), red (avoid)
 - Data source + timestamp disclosed on every forecast
+
+## Feature 2 — Travel-safe Destinations
+
+- When the origin destination shows Red or Yellow overall risk, up to 3 alternatives from the same island group are suggested
+- Each alternative shows its **true risk badge** (green or yellow) — not forced to green
+- Ranked by proximity — includes distance (km) and estimated travel time
+- Section titled "Travel-safe Destinations in {island group}"
 
 ## Commit Conventions
 - `feat:` — new feature

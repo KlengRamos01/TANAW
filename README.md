@@ -10,7 +10,7 @@ Travelers and residents across the Philippines lack a single tool that turns mul
 
 2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — Each destination gets a color-coded badge for the selected date range, calculated from a defined ruleset (PAGASA storm signal thresholds, rainfall, wind speed, sea conditions).
 
-3. **Alternative Destination Suggestions (Same Island Group, Better Forecast)** — When a destination badge is Red or Yellow, the app shows up to 3 alternative destinations within the same island group (Luzon, Visayas, Mindanao) that have Green or Yellow badges for the same date range, ranked by proximity with distance and travel-time estimates.
+3. **Alternative Destination Suggestions (Same Island Group, Better Forecast)** — When a destination badge is Red or Yellow, the app shows up to 3 alternative destinations within the same island group (Luzon, Visayas, Mindanao) that have Green or Yellow badges for the same date range. Each alternative shows its **true risk badge** (green or yellow). Ranked by proximity with distance and travel-time estimates. Section titled "Travel-safe Destinations in {island group}".
 
 4. **[NOT INCLUDED IN V1] Saved Trip Alerts with Risk-Change Notifications** — User saves a trip by entering a destination and date range. The app sends a push notification when the risk badge changes tier before the trip.
 
