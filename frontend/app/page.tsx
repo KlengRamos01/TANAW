@@ -209,8 +209,8 @@ export default function Home() {
           </div>
 
           <div className="mt-8 text-center text-xs text-gray-400">
-            Risk ruleset: PAGASA storm signal thresholds + rainfall + wind speed + sea conditions &middot;{" "}
-            Data source: {forecast.data_source} &middot; Generated at{" "}
+            Data source: {forecast.data_source} &middot;{" "}
+            Generated at{" "}
             {new Date(forecast.generated_at).toLocaleString("en-PH")}
           </div>
 

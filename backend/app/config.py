@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     opencode_api_key: str = ""
     gemini_api_key: str = ""
     weather_api_key: str = ""
+    pagasa_api_key: str = ""
     app_env: str = "development"
     secret_key: str = ""
 

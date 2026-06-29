@@ -17,7 +17,7 @@ TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives 
 | AI / LLM | Google Gemini API (via google-generativeai) |
 | Backend | Python 3.12+ (FastAPI, Uvicorn) |
 | Testing | pytest |
-| Data Sources | PAGASA storm signal ruleset (hardcoded), mock weather (fallback), OpenWeatherMap API (optional) |
+| Data Sources | OpenWeatherMap API (primary), PAGASA API (secondary), mock weather (last resort) |
 | Deploy | Vercel (frontend) + GitHub Actions (backend CI/CD) |
 
 ## Architecture
