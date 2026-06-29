@@ -7,6 +7,15 @@ from app.models import Destination, DailyForecast, OverallTripRisk, ForecastResp
 from app.services.alternatives import find_alternatives
 from app.services.gemini import generate_summaries
 from app.services.risk import calculate_daily_risk, get_overall_trip_risk, risk_level_to_badge
+from app.services.validation import (
+    sanitize_string,
+    validate_search_query,
+    validate_destination_name,
+    validate_date,
+    validate_latitude,
+    validate_longitude,
+    validate_destination_id,
+)
 from app.services.weather import fetch_forecast, lookup_city
 
 router = APIRouter(prefix="/api", tags=["forecast"])
@@ -22,11 +31,15 @@ def _next_id() -> int:
 
 @router.get("/destinations/search", response_model=SearchResult)
 async def search_destinations(query: str = Query(..., min_length=1)):
-    q = query.strip().lower()
+    try:
+        q = validate_search_query(query)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    q_lower = q.lower()
     matches = [
         Destination(**d)
         for d in TOP_50_DESTINATIONS
-        if q in d["name"].lower() or q in d["province"].lower() or q in d["municipality"].lower()
+        if q_lower in d["name"].lower() or q_lower in d["province"].lower() or q_lower in d["municipality"].lower()
     ]
 
     return SearchResult(destinations=matches[:10])
@@ -39,21 +52,40 @@ async def get_destination_forecast(
     start_date: str = Query(None, description="Trip start date (YYYY-MM-DD)"),
     end_date: str = Query(None, description="Trip end date (YYYY-MM-DD)"),
 ):
+    if destination_id is None and not destination_name:
+        raise HTTPException(status_code=400, detail="Provide destination_id or destination_name.")
+
+    dest_id = None
+    try:
+        dest_id = validate_destination_id(destination_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    s_date = None
+    e_date = None
+    try:
+        s_date = validate_date(start_date)
+        e_date = validate_date(end_date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    dest_name_safe = validate_destination_name(destination_name)
+
     destination = None
 
-    if destination_id:
-        dest_data = next((d for d in TOP_50_DESTINATIONS if d["id"] == destination_id), None)
+    if dest_id:
+        dest_data = next((d for d in TOP_50_DESTINATIONS if d["id"] == dest_id), None)
         if dest_data:
             destination = Destination(**dest_data)
 
-    if not destination and destination_name:
-        city = await lookup_city(destination_name.strip())
+    if not destination and dest_name_safe:
+        city = await lookup_city(dest_name_safe)
         if city:
             destination = Destination(
                 id=_next_id(),
-                name=city["name"],
-                municipality=city["name"],
-                province=city.get("country", ""),
+                name=sanitize_string(city["name"]),
+                municipality=sanitize_string(city["name"]),
+                province=sanitize_string(city.get("country", "")),
                 region="",
                 latitude=city["lat"],
                 longitude=city["lon"],
@@ -63,7 +95,7 @@ async def get_destination_forecast(
     if not destination:
         raise HTTPException(status_code=404, detail="Destination not found. Try searching a different name.")
 
-    daily_weather = await fetch_forecast(destination.name, destination.latitude, destination.longitude, start_date, end_date)
+    daily_weather = await fetch_forecast(destination.name, destination.latitude, destination.longitude, s_date, e_date)
 
     if not daily_weather:
         raise HTTPException(status_code=503, detail="Weather data unavailable from all sources. Try again later.")
@@ -128,11 +160,22 @@ async def get_alternatives(
     start_date: str = Query(None, description="Trip start date (YYYY-MM-DD)"),
     end_date: str = Query(None, description="Trip end date (YYYY-MM-DD)"),
 ):
+    try:
+        validate_destination_id(destination_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        s_date = validate_date(start_date)
+        e_date = validate_date(end_date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     dest_data = next((d for d in TOP_50_DESTINATIONS if d["id"] == destination_id), None)
     if not dest_data:
         return AlternativesResponse(
             origin_id=destination_id,
-            origin_name=destination_name or "",
+            origin_name=sanitize_string(destination_name or ""),
             island_group="",
             alternatives=[],
             total_found=0,
@@ -146,7 +189,7 @@ async def get_alternatives(
         lat=dest_data["latitude"],
         lon=dest_data["longitude"],
         region=dest_data["region"],
-        start_date=start_date,
-        end_date=end_date,
+        start_date=s_date,
+        end_date=e_date,
     )
     return AlternativesResponse(**result)
