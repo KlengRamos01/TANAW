@@ -23,7 +23,7 @@ class AlternativesResponse(BaseModel):
     origin_name: str
     island_group: str
     alternatives: list[AlternativeDestination]
-    total_green_found: int
+    total_found: int
     requested: int
     note: str | None = None
 

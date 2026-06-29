@@ -22,7 +22,7 @@ interface AlternativesData {
   origin_name: string
   island_group: string
   alternatives: Alternative[]
-  total_green_found: number
+  total_found: number
   requested: number
   note: string | null
 }

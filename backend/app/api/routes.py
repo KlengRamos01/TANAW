@@ -132,7 +132,7 @@ async def get_alternatives(
             origin_name=destination_name or "",
             island_group="",
             alternatives=[],
-            total_green_found=0,
+            total_found=0,
             requested=3,
             note="Alternatives are available only for pre-loaded destinations.",
         )

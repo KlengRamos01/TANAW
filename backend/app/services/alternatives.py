@@ -69,24 +69,24 @@ def find_alternatives(
             "origin_name": destination_name,
             "island_group": "",
             "alternatives": [],
-            "total_green_found": 0,
+            "total_found": 0,
             "requested": 3,
             "note": "Island group not determined for this destination.",
         }
 
     candidates = [d for d in TOP_50_DESTINATIONS if d["id"] != destination_id and get_island_group(d["region"]) == island_group]
 
-    green_candidates = []
+    safe_candidates = []
     for c in candidates:
         risk = _candidate_risk(c, start_date, end_date)
-        if risk == "green":
+        if risk in ("green", "yellow"):
             dist = _haversine_km(lat, lon, c["latitude"], c["longitude"])
-            green_candidates.append((dist, c))
+            safe_candidates.append((dist, c))
 
-    green_candidates.sort(key=lambda x: x[0])
+    safe_candidates.sort(key=lambda x: x[0])
 
     requested = 3
-    top = green_candidates[:requested]
+    top = safe_candidates[:requested]
 
     from app.models import Destination
 
@@ -101,15 +101,15 @@ def find_alternatives(
         ))
 
     note = None
-    if len(green_candidates) < requested:
-        note = f"No recommended and safe for travel destinations found in {island_group}." if len(green_candidates) == 0 else f"Only {len(green_candidates)} green-rated {'destination' if len(green_candidates) == 1 else 'destinations'} found in {island_group}."
+    if len(safe_candidates) < requested:
+        note = f"Only {len(safe_candidates)} better-rated {'destination' if len(safe_candidates) == 1 else 'destinations'} found in {island_group}." if len(safe_candidates) > 0 else f"No green or yellow destinations found in {island_group}."
 
     return {
         "origin_id": destination_id,
         "origin_name": destination_name,
         "island_group": island_group,
         "alternatives": alternatives,
-        "total_green_found": len(green_candidates),
+        "total_found": len(safe_candidates),
         "requested": requested,
         "note": note,
     }
