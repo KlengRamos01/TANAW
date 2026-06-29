@@ -22,3 +22,7 @@ Travelers and residents across the Philippines lack a single tool that turns mul
 |----------|--------|--------|
 | Primary | OpenWeatherMap | RapidAPI `/fivedaysforcast` endpoint by lat/lon (requires `WEATHER_API_KEY`) |
 | Secondary | PAGASA | Website scrape of `bagong.pagasa.dost.gov.ph` tourist/city forecasts using BeautifulSoup |
+
+## Input Validation
+
+All user inputs are validated and sanitized server-side — HTML stripped, date format checked, lat/lon bounds enforced, lengths limited. Invalid inputs return 400.`

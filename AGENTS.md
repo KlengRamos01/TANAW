@@ -16,7 +16,8 @@ TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives 
 | Frontend | Next.js 14 + Tailwind CSS |
 | AI / LLM | Google Gemini API (via google-generativeai) |
 | Backend | Python 3.12+ (FastAPI, Uvicorn) |
-| Testing | pytest |
+| Testing | pytest (193 tests) |
+| Input Validation | Custom validation module — HTML stripping, date/lat/lon/ID bounds, length limits |
 | Data Sources | OpenWeatherMap API (primary), PAGASA website scrape (secondary) — no mock data |
 | Deploy | Vercel (frontend) + GitHub Actions (backend CI/CD) |
 
@@ -48,22 +49,28 @@ TANAW/
 │       ├── __init__.py
 │       ├── main.py
 │       ├── config.py
-│       ├── models.py
-│       ├── api/
-│       │   ├── __init__.py
-│       │   └── routes.py
-│       ├── data/
-│       │   ├── __init__.py
-│       │   └── destinations.py
-│       ├── services/
-│       │   ├── __init__.py
-│       │   ├── alternatives.py
-│       │   ├── gemini.py
-│       │   ├── risk.py
-│       │   └── weather.py
-│       └── tests/
-│           ├── __init__.py
-│           └── test_risk.py
+│   ├── models.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes.py
+│   ├── data/
+│   │   ├── __init__.py
+│   │   └── destinations.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── alternatives.py
+│   │   ├── gemini.py
+│   │   ├── risk.py
+│   │   ├── validation.py
+│   │   └── weather.py
+│   └── tests/
+│       ├── __init__.py
+│       ├── test_alternatives.py
+│       ├── test_destinations.py
+│       ├── test_gemini.py
+│       ├── test_risk.py
+│       ├── test_validation.py
+│       └── test_weather.py
 ├── frontend/              # Next.js 14 application
 │   ├── package.json
 │   ├── next.config.js
@@ -98,6 +105,12 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
+### Tests
+```bash
+cd backend
+python -m pytest app/tests/ -v    # 193 tests
+```
+
 ### Frontend
 ```bash
 cd frontend
@@ -121,6 +134,21 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 | GET | `/api/destinations/search?query=` | Search destinations (top 50) |
 | GET | `/api/forecast?destination_id=&destination_name=&start_date=&end_date=` | Get 7-day forecast |
 | GET | `/api/alternatives?destination_id=&start_date=&end_date=` | Get 3 closest Green/Yellow alternatives |
+
+## Input Validation
+
+All user inputs are validated and sanitized server-side via a dedicated `validation.py` module:
+
+| Field | Validation |
+|-------|-----------|
+| `query` | HTML stripped, empty/whitespace rejected, max 100 chars |
+| `destination_id` | Must be positive integer |
+| `destination_name` | HTML stripped, max 200 chars |
+| `start_date` / `end_date` | Regex `YYYY-MM-DD`, real calendar date (incl. leap year), range 2020–2100 |
+| `lat` | Range -90 to 90 |
+| `lon` | Range -180 to 180 |
+
+Invalid inputs return **400 Bad Request** with a descriptive error message.
 
 ## Feature 1 — 7-Day Destination Search
 
