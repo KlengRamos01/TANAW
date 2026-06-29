@@ -6,7 +6,7 @@ TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives 
 ## Core Features
 1. **Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a forecast in conversational Filipino/English. ✅
 2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — At-a-glance safety rating per destination per day. ✅
-3. **Alternative Destination Suggestions (Same Island Group, Better Forecast)** — Up to 3 nearby Green-rated alternatives when a destination has Red/Yellow overall risk. ✅
+3. **Alternative Destination Suggestions (Same Island Group, Better Forecast)** — Up to 3 nearby Green or Yellow-rated alternatives when a destination has Red/Yellow overall risk. ✅
 4. **Saved Trip Alerts with Risk-Change Notifications** — ❌ NOT INCLUDED IN V1
 5. **Data Source and Timestamp Disclosure on Every Forecast** — Transparent data provenance on all weather data shown. ✅
 
@@ -17,7 +17,7 @@ TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives 
 | AI / LLM | Google Gemini API (via google-generativeai) |
 | Backend | Python 3.12+ (FastAPI, Uvicorn) |
 | Testing | pytest |
-| Data Sources | OpenWeatherMap API (primary), PAGASA API (secondary), mock weather (last resort) |
+| Data Sources | OpenWeatherMap API (primary), PAGASA website scrape (secondary), mock weather (last resort) |
 | Deploy | Vercel (frontend) + GitHub Actions (backend CI/CD) |
 
 ## Architecture
@@ -110,7 +110,8 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 
 **Note:** The app works without API keys using mock/fallback data. To use real data:
 - `GEMINI_API_KEY` — Google Gemini API key for plain-language summaries
-- `WEATHER_API_KEY` — OpenWeatherMap API key for weather data
+- `WEATHER_API_KEY` — OpenWeatherMap API key (primary weather source)
+- `PAGASA_API_KEY` — PAGASA API key (secondary/fallback; not required for website scrape)
 
 ## API Endpoints
 
@@ -119,7 +120,7 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 | GET | `/health` | Health check |
 | GET | `/api/destinations/search?query=` | Search destinations (top 50) |
 | GET | `/api/forecast/{destination_id}` | Get 7-day forecast |
-| GET | `/api/alternatives?destination_id=&start_date=&end_date=` | Get 3 closest Green alternatives |
+| GET | `/api/alternatives?destination_id=&start_date=&end_date=` | Get 3 closest Green/Yellow alternatives |
 
 ## Feature 1 — 7-Day Destination Search
 
