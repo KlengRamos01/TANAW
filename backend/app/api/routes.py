@@ -1,13 +1,22 @@
-from datetime import datetime
+from datetime import datetime, date
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.data.destinations import TOP_50_DESTINATIONS
-from app.models import Destination, DailyForecast, ForecastResponse, SearchResult
-from app.services.gemini import generate_forecast_summaries
-from app.services.weather import fetch_forecast
+from app.models import Destination, DailyForecast, OverallTripRisk, ForecastResponse, SearchResult
+from app.services.gemini import generate_summaries
+from app.services.risk import calculate_daily_risk, get_overall_trip_risk, risk_level_to_badge
+from app.services.weather import fetch_forecast, lookup_city
 
 router = APIRouter(prefix="/api", tags=["forecast"])
+
+_next_virtual_id = 1000
+
+
+def _next_id() -> int:
+    global _next_virtual_id
+    _next_virtual_id += 1
+    return _next_virtual_id - 1
 
 
 @router.get("/destinations/search", response_model=SearchResult)
@@ -19,29 +28,87 @@ async def search_destinations(query: str = Query(..., min_length=1)):
         if q in d["name"].lower() or q in d["province"].lower() or q in d["municipality"].lower()
     ]
 
-    if not matches:
-        raise HTTPException(status_code=404, detail="No destination found. Try a different search term.")
-
     return SearchResult(destinations=matches[:10])
 
 
-@router.get("/forecast/{destination_id}", response_model=ForecastResponse)
-async def get_destination_forecast(destination_id: int):
-    dest_data = next((d for d in TOP_50_DESTINATIONS if d["id"] == destination_id), None)
-    if not dest_data:
-        raise HTTPException(status_code=404, detail="Destination not found.")
+@router.get("/forecast", response_model=ForecastResponse)
+async def get_destination_forecast(
+    destination_id: int = Query(None, description="Pre-loaded destination ID"),
+    destination_name: str = Query(None, description="Any location name"),
+    start_date: str = Query(None, description="Trip start date (YYYY-MM-DD)"),
+    end_date: str = Query(None, description="Trip end date (YYYY-MM-DD)"),
+):
+    destination = None
 
-    destination = Destination(**dest_data)
-    daily_weather = await fetch_forecast(destination.name, destination.latitude, destination.longitude)
-    summaries = await generate_forecast_summaries(daily_weather, destination.name)
+    if destination_id:
+        dest_data = next((d for d in TOP_50_DESTINATIONS if d["id"] == destination_id), None)
+        if dest_data:
+            destination = Destination(**dest_data)
+
+    if not destination and destination_name:
+        city = await lookup_city(destination_name.strip())
+        if city:
+            destination = Destination(
+                id=_next_id(),
+                name=city["name"],
+                municipality=city["name"],
+                province=city.get("country", ""),
+                region="",
+                latitude=city["lat"],
+                longitude=city["lon"],
+                category="city",
+            )
+
+    if not destination:
+        raise HTTPException(status_code=404, detail="Destination not found. Try searching a different name.")
+
+    daily_weather = await fetch_forecast(destination.name, destination.latitude, destination.longitude, start_date, end_date)
+
+    enriched = []
+    for dw in daily_weather:
+        dw["category"] = destination.category
+        risk_level, risk_reason = calculate_daily_risk(dw)
+
+        try:
+            dt = datetime.strptime(dw["date"], "%Y-%m-%d")
+            day_name = dt.strftime("%A")
+        except ValueError:
+            day_name = ""
+
+        enriched.append({
+            "date": dw["date"],
+            "day_name": day_name,
+            "risk_level": risk_level,
+            "risk_reason": risk_reason,
+            "wind_speed_max": dw.get("wind_speed_max", 0),
+            "rain_total_3h": dw.get("rain_total_3h", 0),
+            "condition": dw.get("condition", ""),
+            "description": dw.get("description", ""),
+            "pop_max": dw.get("pop_max", 0),
+        })
+
+    summaries = await generate_summaries(enriched, destination.name)
 
     forecasts = []
-    for sw in summaries:
-        forecasts.append(DailyForecast(**sw))
+    for i, f in enumerate(enriched):
+        forecasts.append(DailyForecast(
+            date=f["date"],
+            day_name=f["day_name"],
+            risk_level=f["risk_level"],
+            risk_reason=f["risk_reason"],
+            summary=summaries[i] if i < len(summaries) else "",
+        ))
+
+    overall_level, overall_reason = get_overall_trip_risk([f.model_dump() for f in forecasts])
 
     return ForecastResponse(
         destination=destination,
         forecasts=forecasts,
+        overall_trip_risk=OverallTripRisk(
+            level=overall_level,
+            **risk_level_to_badge(overall_level),
+            reason=overall_reason,
+        ),
         data_source="PAGASA / OpenWeatherMap / Gemini",
         generated_at=datetime.utcnow().isoformat() + "Z",
     )

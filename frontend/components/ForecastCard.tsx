@@ -4,10 +4,11 @@ interface ForecastProps {
   dayName: string
   date: string
   riskLevel: string
+  riskReason: string
   summary: string
 }
 
-export default function ForecastCard({ dayName, date, riskLevel, summary }: ForecastProps) {
+export default function ForecastCard({ dayName, date, riskLevel, riskReason, summary }: ForecastProps) {
   const formattedDate = new Date(date + "T12:00:00").toLocaleDateString("en-PH", {
     month: "short",
     day: "numeric",
@@ -22,7 +23,8 @@ export default function ForecastCard({ dayName, date, riskLevel, summary }: Fore
         </div>
         <RiskBadge level={riskLevel} />
       </div>
-      <p className="text-gray-700 text-sm leading-relaxed mt-1">{summary}</p>
+      <p className="text-xs text-gray-400 italic">{riskReason}</p>
+      <p className="text-gray-700 text-sm leading-relaxed">{summary}</p>
     </div>
   )
 }

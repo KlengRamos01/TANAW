@@ -16,12 +16,21 @@ class DailyForecast(BaseModel):
     date: str
     day_name: str
     risk_level: str
+    risk_reason: str
     summary: str
+
+
+class OverallTripRisk(BaseModel):
+    level: str
+    label: str
+    color: str
+    reason: str
 
 
 class ForecastResponse(BaseModel):
     destination: Destination
     forecasts: list[DailyForecast]
+    overall_trip_risk: OverallTripRisk
     data_source: str
     generated_at: str
 

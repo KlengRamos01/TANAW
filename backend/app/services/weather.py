@@ -1,5 +1,4 @@
 import random
-from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 import httpx
@@ -22,9 +21,9 @@ CONDITIONS_POOL = [
 ]
 
 
-async def fetch_forecast(dest_name: str, lat: float, lon: float) -> list[dict]:
+async def fetch_forecast(dest_name: str, lat: float, lon: float, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
     if not settings.weather_api_key:
-        return _generate_mock_forecast()
+        return _generate_range(start_date, end_date)
 
     try:
         async with httpx.AsyncClient() as client:
@@ -39,15 +38,65 @@ async def fetch_forecast(dest_name: str, lat: float, lon: float) -> list[dict]:
             )
             if resp.status_code == 200:
                 data = resp.json()
-                return _extrapolate_7day(data)
+                return _extrapolate_range(data, start_date, end_date)
     except Exception:
         pass
 
-    return _generate_mock_forecast()
+    return _generate_range(start_date, end_date)
 
 
-def _extrapolate_7day(current: dict) -> list[dict]:
+async def lookup_city(name: str) -> dict | None:
+    if not settings.weather_api_key:
+        return None
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://{RAPIDAPI_HOST}/city",
+                params={"city": name, "lang": "EN"},
+                headers={
+                    "x-rapidapi-key": settings.weather_api_key,
+                    "x-rapidapi-host": RAPIDAPI_HOST,
+                },
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                country = data.get("sys", {}).get("country", "")
+                if country != "PH":
+                    return None
+                return {
+                    "name": data.get("name", name),
+                    "lat": data["coord"]["lat"],
+                    "lon": data["coord"]["lon"],
+                    "country": country,
+                }
+    except Exception:
+        pass
+    return None
+
+
+def _compute_dates(start_date: str | None, end_date: str | None) -> list[str]:
     today = datetime.now().date()
+
+    if start_date:
+        s = datetime.strptime(start_date, "%Y-%m-%d").date()
+    else:
+        s = today
+
+    if end_date:
+        e = datetime.strptime(end_date, "%Y-%m-%d").date()
+    else:
+        e = s + timedelta(days=6)
+
+    if e < s:
+        e = s
+
+    return [(s + timedelta(days=i)).isoformat() for i in range((e - s).days + 1)]
+
+
+def _extrapolate_range(current: dict, start_date: str | None, end_date: str | None) -> list[dict]:
+    dates = _compute_dates(start_date, end_date)
 
     temp_f = current["main"]["temp"]
     feels_like_f = current["main"]["feels_like"]
@@ -59,24 +108,26 @@ def _extrapolate_7day(current: dict) -> list[dict]:
     feels_like_c = _f_to_c(feels_like_f)
     wind_ms = _mph_to_ms(wind_mph)
 
+    today = datetime.now().date()
     result = []
-    for i in range(7):
-        date = (today + timedelta(days=i)).isoformat()
+    for i, date_str in enumerate(dates):
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+        day_offset = (date_obj - today).days
 
-        variation = 1 + (i * 0.5 - 1.5) * 0.03 + random.uniform(-0.04, 0.04)
+        variation = 1 + (abs(day_offset) * 0.03) + random.uniform(-0.04, 0.04)
         day_temp = round(temp_c * variation, 1)
         day_feels = round(feels_like_c * variation, 1)
         day_humidity = max(40, min(100, humidity + random.randint(-15, 10)))
         day_wind = max(0, round(wind_ms + random.uniform(-2, 5), 1))
 
-        if i == 0:
+        if day_offset == 0:
             cond, desc = weather["main"], weather["description"]
         else:
             idx = random.randint(0, len(CONDITIONS_POOL) - 1)
             cond, desc = CONDITIONS_POOL[idx]
 
         result.append({
-            "date": date,
+            "date": date_str,
             "temp_min": round(day_temp - random.uniform(2, 5), 1),
             "temp_max": round(day_temp + random.uniform(1, 4), 1),
             "temp_avg": day_temp,
@@ -93,23 +144,15 @@ def _extrapolate_7day(current: dict) -> list[dict]:
     return result
 
 
-def _f_to_c(f: float) -> float:
-    return round((f - 32) * 5 / 9, 1)
-
-
-def _mph_to_ms(mph: float) -> float:
-    return round(mph * 0.44704, 1)
-
-
-def _generate_mock_forecast() -> list[dict]:
+def _generate_range(start_date: str | None, end_date: str | None) -> list[dict]:
     random.seed(42)
+    dates = _compute_dates(start_date, end_date)
 
     result = []
-    for i in range(7):
-        date = (datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d")
+    for i, date_str in enumerate(dates):
         cond, desc = CONDITIONS_POOL[i % len(CONDITIONS_POOL)]
         result.append({
-            "date": date,
+            "date": date_str,
             "temp_min": round(random.uniform(22, 26), 1),
             "temp_max": round(random.uniform(29, 34), 1),
             "temp_avg": round(random.uniform(26, 30), 1),
@@ -124,3 +167,11 @@ def _generate_mock_forecast() -> list[dict]:
         })
 
     return result
+
+
+def _f_to_c(f: float) -> float:
+    return round((f - 32) * 5 / 9, 1)
+
+
+def _mph_to_ms(mph: float) -> float:
+    return round(mph * 0.44704, 1)

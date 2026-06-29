@@ -43,26 +43,26 @@ export default function DestinationSearch({
     setLoading(true)
     try {
       const res = await fetch(`http://localhost:8000/api/destinations/search?query=${encodeURIComponent(value)}`)
-      if (!res.ok) {
-        setResults([])
-        setOpen(true)
-        return
-      }
       const data = await res.json()
-      setResults(data.destinations)
-      setOpen(true)
+      setResults(data.destinations || [])
     } catch {
       setResults([])
-      setOpen(true)
     } finally {
       setLoading(false)
     }
+    setOpen(true)
   }
 
   function select(dest: Destination) {
-    setQuery(`${dest.name}, ${dest.province}`)
+    setQuery(`${dest.name}, ${dest.province || "Philippines"}`)
     setOpen(false)
     onSelect(dest)
+  }
+
+  function searchDynamic() {
+    const trimmed = query.trim()
+    if (!trimmed) return
+    select({ id: 0, name: trimmed, municipality: "", province: "", region: "", category: "" })
   }
 
   return (
@@ -71,7 +71,7 @@ export default function DestinationSearch({
         type="text"
         value={query}
         onChange={(e) => handleInput(e.target.value)}
-        placeholder="Search a destination... (e.g. El Nido, Boracay)"
+        placeholder="Search a Philippine destination..."
         className="w-full px-5 py-4 rounded-xl border border-gray-300 bg-white shadow-sm text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
       {loading && (
@@ -80,28 +80,28 @@ export default function DestinationSearch({
         </div>
       )}
 
-      {open && results.length > 0 && (
+      {open && query.trim().length >= 1 && (
         <ul className="absolute z-10 mt-2 w-full bg-white rounded-xl shadow-lg border border-gray-200 max-h-72 overflow-y-auto">
-          {results.map((dest) => (
+          {results.length > 0 && results.map((dest) => (
             <li
               key={dest.id}
-              onClick={() => select(dest)}
-              className="px-5 py-3 cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0"
+              onMouseDown={(e) => { e.preventDefault(); select(dest) }}
+              className="px-5 py-3 cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100"
             >
               <span className="font-medium">{dest.name}</span>
               <span className="text-gray-500 text-sm ml-2">
-                {dest.municipality}, {dest.province}
+                {dest.municipality && `${dest.municipality}, `}{dest.province}
               </span>
               <span className="text-gray-400 text-xs ml-2 capitalize">({dest.category})</span>
             </li>
           ))}
+          <li
+            onMouseDown={(e) => { e.preventDefault(); searchDynamic() }}
+            className="px-5 py-3 cursor-pointer hover:bg-blue-50 transition-colors text-blue-600 font-medium"
+          >
+            {results.length > 0 ? `Also search "${query.trim()}" as a Philippine destination →` : `Search "${query.trim()}" as a Philippine destination →`}
+          </li>
         </ul>
-      )}
-
-      {open && query.trim().length >= 1 && !loading && results.length === 0 && (
-        <div className="absolute z-10 mt-2 w-full bg-white rounded-xl shadow-lg border border-gray-200 p-5 text-center text-gray-500">
-          No destinations found. Try a different search term.
-        </div>
       )}
     </div>
   )

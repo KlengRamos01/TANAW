@@ -1,24 +1,25 @@
-import re
 from datetime import datetime
 
 from app.config import settings
 
-MOCK_SUMMARIES = [
-    ("Clear", "green", "Sunny skies and calm winds — perfect for outdoor adventures!"),
-    ("Clouds", "yellow", "Cloudy with occasional showers, better bring an umbrella when going out."),
-    ("Rain", "red", "Moderate to heavy rain expected, roads may become slippery so drive carefully."),
-    ("Clouds", "yellow", "Overcast skies with intermittent rain, outdoor plans might need a backup."),
-    ("Rain", "red", "Light to moderate rain throughout the day, beach trips are not advisable."),
-    ("Clear", "green", "Fair weather with mild winds, ideal for island hopping and tours."),
-    ("Thunderstorm", "red", "Thunderstorms likely in the afternoon, postpone outdoor excursions."),
-]
+MOCK_SUMMARIES_BY_RISK = {
+    "green": "Sunny skies and calm winds — perfect for outdoor adventures!",
+    "yellow": "Cloudy with occasional showers, better bring an umbrella when going out.",
+    "red": "Moderate to heavy rain expected, roads may become slippery so drive carefully.",
+}
+
+MOCK_SUMMARIES_BY_CONDITION = {
+    "Clear": "Sunny skies and calm winds — perfect for outdoor adventures!",
+    "Clouds": "Cloudy with occasional showers, better bring an umbrella when going out.",
+    "Rain": "Moderate to heavy rain expected, roads may become slippery so drive carefully.",
+    "Thunderstorm": "Thunderstorms likely in the afternoon, postpone outdoor excursions.",
+    "Drizzle": "Light drizzle expected, pack a light raincoat just in case.",
+}
 
 
-async def generate_forecast_summaries(daily_data: list[dict], destination_name: str) -> list[dict[str, str]]:
-    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
+async def generate_summaries(daily_forecasts: list[dict], destination_name: str) -> list[str]:
     if not settings.gemini_api_key:
-        return _fallback_summaries(daily_data, day_names)
+        return _fallback_summaries(daily_forecasts)
 
     try:
         import google.generativeai as genai
@@ -26,99 +27,69 @@ async def generate_forecast_summaries(daily_data: list[dict], destination_name: 
         genai.configure(api_key=settings.gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash")
 
-        prompt = _build_prompt(daily_data, destination_name)
+        prompt = _build_prompt(daily_forecasts, destination_name)
         response = model.generate_content(prompt, generation_config={"max_output_tokens": 1024, "temperature": 0.3})
-        return _parse_response(response.text, daily_data, day_names)
+
+        parsed = _parse_response(response.text, len(daily_forecasts))
+        if len(parsed) == len(daily_forecasts):
+            return parsed
     except Exception:
-        return _fallback_summaries(daily_data, day_names)
+        pass
+
+    return _fallback_summaries(daily_forecasts)
 
 
-def _build_prompt(daily_data: list[dict], destination_name: str) -> str:
+def _build_prompt(forecasts: list[dict], destination_name: str) -> str:
     lines = []
-    for d in daily_data:
+    for f in forecasts:
+        risk_badge = f["risk_level"].upper()
         lines.append(
-            f"- {d['date']}: {d['condition']} ({d['description']}), "
-            f"temp {d['temp_min']}-{d['temp_max']}°C, "
-            f"humidity {d['humidity_avg']}%, "
-            f"wind up to {d['wind_speed_max']} m/s, "
-            f"rain {d['rain_total_3h']}mm, "
-            f"precip chance {d['pop_max'] * 100:.0f}%"
+            f"- {f['day_name']} ({f['date']}): risk={risk_badge}, "
+            f"wind {f.get('wind_speed_max', 0)} m/s, "
+            f"rain {f.get('rain_total_3h', 0)}mm, "
+            f"{f.get('condition', '')} ({f.get('description', '')})"
         )
 
-    return f"""You are a weather analyst for the Philippines. Given raw weather data for {destination_name}, generate a 7-day forecast.
+    return f"""You are a weather analyst for the Philippines. Given the risk-assessed forecast for {destination_name}, write one plain-language sentence per day explaining the weather impact.
 
-For each day, output EXACTLY one line:
-DayName | RiskLevel | One plain-language sentence about weather and travel impact.
+Risk levels are already calculated. Your job is ONLY to write the sentence.
 
-RiskLevel must be one of: green (safe), yellow (caution), red (dangerous/avoid).
+For each day, output EXACTLY one line with just the sentence, no prefix or labels.
 
-Example:
-Monday | green | Sunny with light breezes, great for beach trips and island tours.
-
-CRITICAL: One line per day. No extra text before or after. No markdown.
+Example outputs:
+Sunny with light breezes, great for beach trips and island tours.
+Heavy rain and strong winds expected, ferry crossings may be disrupted.
 
 Data:
 {chr(10).join(lines)}"""
 
 
-def _parse_response(text: str, daily_data: list[dict], day_names: list[str]) -> list[dict[str, str]]:
-    results = []
-    lines = text.strip().split("\n")
-
-    for i, line in enumerate(lines):
-        line = line.strip()
-        if not line or "|" not in line:
-            continue
-
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 3:
-            continue
-
-        risk = parts[1].strip().lower()
-        if risk not in ("green", "yellow", "red"):
-            risk = "yellow"
-
-        summary = parts[2].strip()
-
-        day_idx = i if i < len(daily_data) else len(daily_data) - 1
-        date = daily_data[day_idx]["date"] if day_idx < len(daily_data) else ""
-        try:
-            dt = datetime.strptime(date, "%Y-%m-%d")
-            day_name = dt.strftime("%A")
-        except (ValueError, IndexError):
-            day_name = day_names[day_idx % 7] if day_idx < 7 else ""
-
-        results.append({
-            "date": date,
-            "day_name": day_name,
-            "risk_level": risk,
-            "summary": summary,
-        })
-
-    return results
+def _parse_response(text: str, expected_count: int) -> list[str]:
+    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+    out = []
+    for line in lines:
+        if "|" in line:
+            parts = line.split("|")
+            if len(parts) >= 3:
+                line = parts[-1].strip()
+        if len(line) > 10:
+            out.append(line)
+    return out[:expected_count]
 
 
-def _fallback_summaries(daily_data: list[dict], day_names: list[str]) -> list[dict[str, str]]:
-    results = []
-    for i, day in enumerate(daily_data):
-        try:
-            dt = datetime.strptime(day["date"], "%Y-%m-%d")
-            day_name = dt.strftime("%A")
-        except ValueError:
-            day_name = day_names[i % 7]
+def _fallback_summaries(forecasts: list[dict]) -> list[str]:
+    summaries = []
+    for f in forecasts:
+        condition = f.get("condition", "")
+        risk = f.get("risk_level", "yellow")
 
-        fallback = _generate_fallback(day["condition"])
-        results.append({
-            "date": day["date"],
-            "day_name": day_name,
-            "risk_level": fallback[1],
-            "summary": fallback[2],
-        })
-    return results
+        if risk == "red":
+            base = MOCK_SUMMARIES_BY_CONDITION.get(condition) or MOCK_SUMMARIES_BY_RISK["red"]
+        elif risk == "yellow":
+            base = MOCK_SUMMARIES_BY_CONDITION.get(condition) or MOCK_SUMMARIES_BY_RISK["yellow"]
+        else:
+            base = MOCK_SUMMARIES_BY_CONDITION.get(condition) or MOCK_SUMMARIES_BY_RISK["green"]
 
+        summaries.append(base)
 
-def _generate_fallback(condition: str) -> tuple:
-    for key, risk, summary in MOCK_SUMMARIES:
-        if key == condition:
-            return (key, risk, summary)
-    return ("Clouds", "yellow", "Cloudy skies with a chance of rain, plan accordingly.")
+    return summaries

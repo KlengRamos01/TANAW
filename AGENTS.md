@@ -4,7 +4,7 @@
 TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives Filipinos clear, location-specific weather forecasts for the days ahead. It tells them which destinations to avoid due to storms or unsafe conditions and recommends nearby places with better weather instead.
 
 ## Core Features
-1. **7-Day Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a 7-day forecast in conversational Filipino/English.
+1. ** Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a forecast in conversational Filipino/English.
 2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — At-a-glance safety rating per destination per day.
 3. **Alternative Destination Suggestions (Same Region, Better Forecast)** — AI-recommended nearby alternatives when a destination has poor weather.
 4. **Saved Trip Alerts with Risk-Change Notifications** — Monitor saved trips and get notified when the risk level changes.
