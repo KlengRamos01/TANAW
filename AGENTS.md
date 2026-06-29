@@ -133,6 +133,21 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 3. Set root directory to `frontend/`
 4. Add environment variable `NEXT_PUBLIC_API_URL` pointing to your deployed backend URL
 
+### Deploy (Backend — Render)
+
+1. Go to [dashboard.render.com](https://dashboard.render.com) → **New +** → **Web Service**
+2. Connect your GitHub repo, set root directory to `backend/`
+3. **Start Command**: `bash start.sh`
+4. Add environment variables:
+   | Variable | Value |
+   |----------|-------|
+   | `GEMINI_API_KEY` | your Gemini API key |
+   | `WEATHER_API_KEY` | your OpenWeatherMap RapidAPI key |
+   | `CORS_ORIGINS` | your Vercel frontend URL (e.g. `https://tanaw.vercel.app`) |
+   | `APP_ENV` | `production` |
+5. Deploy, then copy the URL (e.g. `https://tanaw-api.onrender.com`)
+6. (Optional) Set `RENDER_DEPLOY_HOOK` in your GitHub repo secrets for auto-deploy on push to `main`
+
 ## API Endpoints
 
 | Method | Path | Description |

@@ -15,5 +15,12 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r backend/requirements.txt
-      - name: Deploy
-        run: echo "Add deploy step here"
+      - name: Trigger Render Deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "No RENDER_DEPLOY_HOOK secret set — skipping deploy"
+          else
+            curl -X POST "$RENDER_DEPLOY_HOOK"
+          fi
