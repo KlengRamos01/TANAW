@@ -110,7 +110,7 @@ async def get_destination_forecast(
             **risk_level_to_badge(overall_level),
             reason=overall_reason,
         ),
-        data_source="OpenWeatherMap / PAGASA / Gemini",
+        data_source="OpenWeatherMap / PAGASA (scraped) / Gemini",
         generated_at=datetime.utcnow().isoformat() + "Z",
     )
 

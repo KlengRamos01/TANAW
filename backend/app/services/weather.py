@@ -1,4 +1,5 @@
 import random
+import re
 from datetime import datetime, timedelta
 
 import httpx
@@ -6,7 +7,8 @@ import httpx
 from app.config import settings
 
 RAPIDAPI_HOST = "open-weather13.p.rapidapi.com"
-PAGASA_API_BASE = "https://api.pagasa.dost.gov.ph"
+PAGASA_TOURIST_URL = "https://bagong.pagasa.dost.gov.ph/weather/weather-outlook-selected-tourist-areas"
+PAGASA_CITIES_URL = "https://bagong.pagasa.dost.gov.ph/weather/weather-outlook-selected-philippine-cities"
 
 CONDITIONS_POOL = [
     ("Clear", "clear sky"),
@@ -27,7 +29,7 @@ async def fetch_forecast(dest_name: str, lat: float, lon: float, start_date: str
     if result is not None:
         return result
 
-    result = await _try_pagasa(lat, lon, start_date, end_date)
+    result = await _try_pagasa(dest_name, start_date, end_date)
     if result is not None:
         return result
 
@@ -86,90 +88,151 @@ async def _try_openweather(dest_name: str, start_date: str | None, end_date: str
     return None
 
 
-async def _try_pagasa(lat: float, lon: float, start_date: str | None, end_date: str | None) -> list[dict] | None:
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{PAGASA_API_BASE}/weather/forecasts",
-                params={"lat": lat, "lon": lon},
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                parsed = _parse_pagasa_response(data, start_date, end_date)
-                if parsed:
-                    return parsed
-    except Exception:
-        pass
+async def _try_pagasa(dest_name: str, start_date: str | None, end_date: str | None) -> list[dict] | None:
+    from bs4 import BeautifulSoup
+
+    result = await _scrape_pagasa_page(PAGASA_TOURIST_URL, dest_name, start_date, end_date)
+    if result is not None:
+        return result
+
+    result = await _scrape_pagasa_page(PAGASA_CITIES_URL, dest_name, start_date, end_date)
+    if result is not None:
+        return result
+
     return None
 
 
-def _parse_pagasa_response(data: dict, start_date: str | None, end_date: str | None) -> list[dict] | None:
-    forecasts_raw = data.get("data") or data.get("forecasts") or data.get("items")
-    if not forecasts_raw or not isinstance(forecasts_raw, list):
-        return None
+async def _scrape_pagasa_page(url: str, dest_name: str, start_date: str | None, end_date: str | None) -> list[dict] | None:
+    from bs4 import BeautifulSoup
 
-    dates_set = set(_compute_dates(start_date, end_date))
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=15)
+            if resp.status_code != 200:
+                return None
+            soup = BeautifulSoup(resp.text, "html.parser")
 
-    result = []
-    for entry in forecasts_raw:
-        date_str = entry.get("date") or entry.get("forecast_date") or ""
-        if date_str[:10] not in dates_set:
-            continue
+            issued_el = soup.find("b", string=re.compile(r"Issued at", re.I))
+            if not issued_el:
+                return None
 
-        temp = entry.get("temperature", {})
-        wind = entry.get("wind", {})
-        humidity_val = entry.get("humidity")
-        condition_raw = entry.get("weather") or entry.get("condition") or ""
-        condition_str = _map_pagasa_condition(condition_raw)
+            table = soup.find("table", class_="desktop")
+            if not table:
+                return None
 
-        result.append({
-            "date": date_str[:10],
-            "temp_min": _safe_float(temp.get("min")) if isinstance(temp, dict) else _safe_float(temp),
-            "temp_max": _safe_float(temp.get("max")) if isinstance(temp, dict) else _safe_float(temp),
-            "temp_avg": _safe_float(temp.get("avg") or temp.get("mean")) if isinstance(temp, dict) else _safe_float(temp),
-            "feels_like_avg": _safe_float(temp.get("feels_like") or temp.get("avg")) if isinstance(temp, dict) else _safe_float(temp),
-            "humidity_avg": int(_safe_float(humidity_val)) if humidity_val else random.randint(65, 95),
-            "wind_speed_max": _safe_float(wind.get("max") or wind.get("speed_max")) if isinstance(wind, dict) else _safe_float(wind),
-            "wind_speed_avg": _safe_float(wind.get("avg") or wind.get("speed")) if isinstance(wind, dict) else _safe_float(wind),
-            "condition": condition_str,
-            "description": condition_raw.strip() if isinstance(condition_raw, str) else "",
-            "rain_total_3h": _safe_float(entry.get("rain") or entry.get("rainfall") or 0),
-            "pop_max": _safe_float(entry.get("pop") or entry.get("probability") or 0),
-        })
+            rows = table.find_all("tr")
+            matched = None
+            best_score = 0
 
-    if not result and forecasts_raw and len(forecasts_raw) > 0:
-        first = forecasts_raw[0]
-        temp = first.get("temperature", {})
-        wind = first.get("wind", {})
-        humidity_val = first.get("humidity")
-        condition_raw = first.get("weather") or first.get("condition") or ""
-        condition_str = _map_pagasa_condition(condition_raw)
+            dest_lower = dest_name.lower()
 
-        base_temp = _safe_float(temp.get("avg") or temp.get("mean")) if isinstance(temp, dict) else _safe_float(temp)
-        base_wind = _safe_float(wind.get("avg") or wind.get("speed")) if isinstance(wind, dict) else _safe_float(wind)
-        base_humidity = int(_safe_float(humidity_val)) if humidity_val else 80
+            for row in rows:
+                area_cell = row.find("td")
+                if not area_cell:
+                    continue
+                area_name = area_cell.get_text(strip=True)
+                if not area_name:
+                    continue
 
-        if base_temp or base_wind:
+                score = _match_area(area_name.lower(), dest_lower)
+                if score > best_score:
+                    best_score = score
+                    matched = row
+
+            if not matched or best_score < 0.3:
+                return None
+
+            weather_div = matched.find("div", class_="weather-values")
+            temp_div = matched.find("div", class_="ol-temperature")
+
+            if not weather_div and not temp_div:
+                weather_div = matched.find_all("td")
+                if len(weather_div) >= 3:
+                    weather_cell = weather_div[1]
+                    temp_cell = weather_div[2]
+                else:
+                    return None
+            else:
+                weather_cell = weather_div
+                temp_cell = temp_div
+
+            condition_raw = ""
+            img = None
+            if weather_cell:
+                img = weather_cell.find("img")
+                if img and img.get("title"):
+                    condition_raw = img["title"]
+                elif weather_cell.get_text(strip=True):
+                    condition_raw = weather_cell.get_text(strip=True)
+
+            condition_str = _map_pagasa_condition(condition_raw)
+
+            temp_min = 0.0
+            temp_max = 0.0
+            if temp_cell:
+                min_span = temp_cell.find("span", class_="min")
+                max_span = temp_cell.find("span", class_="max")
+                if min_span:
+                    temp_min = _parse_temp_c(min_span.get_text(strip=True))
+                if max_span:
+                    temp_max = _parse_temp_c(max_span.get_text(strip=True))
+
+            if not temp_min and not temp_max:
+                return None
+
+            avg = (temp_min + temp_max) / 2 if temp_min and temp_max else (temp_min or temp_max)
+
             dates = _compute_dates(start_date, end_date)
+            result = []
             for i, date_str in enumerate(dates):
-                variation = 1 + (i * 0.03) + random.uniform(-0.04, 0.04)
+                variation = 1 + (abs(i) * 0.02) + random.uniform(-0.03, 0.03)
+                day_min = round(avg * variation - random.uniform(2, 4), 1)
+                day_max = round(avg * variation + random.uniform(1, 3), 1)
+
+                cond_at = condition_str if i == 0 else CONDITIONS_POOL[i % len(CONDITIONS_POOL)][0]
+                desc_at = condition_raw if i == 0 else CONDITIONS_POOL[i % len(CONDITIONS_POOL)][1]
+
+                is_wet = cond_at in ("Rain", "Thunderstorm", "Drizzle")
                 result.append({
                     "date": date_str,
-                    "temp_min": round(base_temp * variation - random.uniform(2, 4), 1) if base_temp else round(random.uniform(22, 26), 1),
-                    "temp_max": round(base_temp * variation + random.uniform(1, 3), 1) if base_temp else round(random.uniform(29, 34), 1),
-                    "temp_avg": round(base_temp * variation, 1) if base_temp else round(random.uniform(26, 30), 1),
-                    "feels_like_avg": round(base_temp * variation, 1) if base_temp else round(random.uniform(27, 33), 1),
-                    "humidity_avg": max(40, min(100, base_humidity + random.randint(-10, 10))),
-                    "wind_speed_max": round(base_wind * 1.5 + random.uniform(0, 3), 1) if base_wind else round(random.uniform(5, 40), 1),
-                    "wind_speed_avg": round(base_wind + random.uniform(-1, 2), 1) if base_wind else round(random.uniform(3, 18), 1),
-                    "condition": condition_str if i == 0 else CONDITIONS_POOL[i % len(CONDITIONS_POOL)][0],
-                    "description": condition_raw.strip() if isinstance(condition_raw, str) and i == 0 else CONDITIONS_POOL[i % len(CONDITIONS_POOL)][1],
-                    "rain_total_3h": round(random.uniform(0, 8), 1),
-                    "pop_max": round(random.uniform(0, 0.6), 2),
+                    "temp_min": day_min,
+                    "temp_max": day_max,
+                    "temp_avg": round(avg * variation, 1),
+                    "feels_like_avg": round(avg * variation, 1),
+                    "humidity_avg": random.randint(70, 95),
+                    "wind_speed_max": round(random.uniform(8, 25), 1),
+                    "wind_speed_avg": round(random.uniform(5, 15), 1),
+                    "condition": cond_at,
+                    "description": desc_at[:120] if isinstance(desc_at, str) else desc_at,
+                    "rain_total_3h": round(random.uniform(1, 15), 1) if is_wet else 0,
+                    "pop_max": round(random.uniform(0.3, 0.9), 2) if is_wet else round(random.uniform(0, 0.4), 2),
                 })
 
-    return result if result else None
+            return result if result else None
+
+    except Exception:
+        return None
+
+
+def _match_area(area_name: str, dest_name: str) -> float:
+    if area_name == dest_name:
+        return 1.0
+    if area_name in dest_name or dest_name in area_name:
+        return 0.8
+    area_words = set(area_name.split())
+    dest_words = set(dest_name.split())
+    if not area_words or not dest_words:
+        return 0.0
+    common = area_words & dest_words
+    return len(common) / max(len(area_words), len(dest_words))
+
+
+def _parse_temp_c(raw: str) -> float:
+    cleaned = re.sub(r"[^\d.\-]", "", raw)
+    try:
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return 0.0
 
 
 def _map_pagasa_condition(raw: str) -> str:
