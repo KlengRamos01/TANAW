@@ -144,8 +144,8 @@ def _extrapolate_range(current: dict, start_date: str | None, end_date: str | No
     return result
 
 
-def _generate_range(start_date: str | None, end_date: str | None) -> list[dict]:
-    random.seed(42)
+def _generate_range(start_date: str | None, end_date: str | None, seed: int = 42) -> list[dict]:
+    random.seed(seed)
     dates = _compute_dates(start_date, end_date)
 
     result = []

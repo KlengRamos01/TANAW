@@ -1,3 +1,27 @@
+REGION_TO_ISLAND_GROUP: dict[str, str] = {
+    "Ilocos": "Luzon",
+    "Cordillera": "Luzon",
+    "Cagayan Valley": "Luzon",
+    "Central Luzon": "Luzon",
+    "CALABARZON": "Luzon",
+    "MIMAROPA": "Luzon",
+    "Bicol": "Luzon",
+    "NCR": "Luzon",
+    "Western Visayas": "Visayas",
+    "Central Visayas": "Visayas",
+    "Eastern Visayas": "Visayas",
+    "Zamboanga Peninsula": "Mindanao",
+    "Northern Mindanao": "Mindanao",
+    "Davao": "Mindanao",
+    "SOCCSKSARGEN": "Mindanao",
+    "Caraga": "Mindanao",
+}
+
+
+def get_island_group(region: str) -> str:
+    return REGION_TO_ISLAND_GROUP.get(region, "")
+
+
 TOP_50_DESTINATIONS = [
     {"id": 1, "name": "El Nido", "municipality": "El Nido", "province": "Palawan", "region": "MIMAROPA", "latitude": 11.1958, "longitude": 119.4092, "category": "beach"},
     {"id": 2, "name": "Boracay", "municipality": "Malay", "province": "Aklan", "region": "Western Visayas", "latitude": 11.9674, "longitude": 121.9248, "category": "beach"},

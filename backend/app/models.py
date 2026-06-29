@@ -12,6 +12,22 @@ class Destination(BaseModel):
     category: str
 
 
+class AlternativeDestination(BaseModel):
+    destination: Destination
+    distance_km: float
+    travel_time_estimate: str
+
+
+class AlternativesResponse(BaseModel):
+    origin_id: int
+    origin_name: str
+    island_group: str
+    alternatives: list[AlternativeDestination]
+    total_green_found: int
+    requested: int
+    note: str | None = None
+
+
 class DailyForecast(BaseModel):
     date: str
     day_name: str

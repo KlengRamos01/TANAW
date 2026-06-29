@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Alternatives from "../components/Alternatives"
 import DestinationSearch from "../components/DestinationSearch"
 import ForecastCard from "../components/ForecastCard"
 import RiskBadge from "../components/RiskBadge"
@@ -56,6 +57,7 @@ export default function Home() {
   const [startDate, setStartDate] = useState(todayStr())
   const [endDate, setEndDate] = useState(weekFromNow())
   const [showDatePicker, setShowDatePicker] = useState(false)
+  const [alternatives, setAlternatives] = useState<any>(null)
 
   async function handleSelect(dest: Destination) {
     setSelectedDest(dest)
@@ -69,6 +71,7 @@ export default function Home() {
     setLoading(true)
     setError("")
     setForecast(null)
+    setAlternatives(null)
 
     try {
       const params = new URLSearchParams()
@@ -85,6 +88,20 @@ export default function Home() {
       if (!res.ok) throw new Error("Failed to load forecast")
       const data: ForecastResponse = await res.json()
       setForecast(data)
+
+      if (data.overall_trip_risk.level !== "green" && selectedDest.id > 0) {
+        const altParams = new URLSearchParams()
+        altParams.set("destination_id", String(selectedDest.id))
+        altParams.set("start_date", startDate)
+        altParams.set("end_date", endDate)
+        altParams.set("region", selectedDest.region)
+        const altRes = await fetch(`http://localhost:8000/api/alternatives?${altParams}`)
+        if (altRes.ok) {
+          setAlternatives(await altRes.json())
+        }
+      } else {
+        setAlternatives(null)
+      }
     } catch {
       setError("Could not load forecast. Make sure the backend is running.")
     } finally {
@@ -196,6 +213,8 @@ export default function Home() {
             Data source: {forecast.data_source} &middot; Generated at{" "}
             {new Date(forecast.generated_at).toLocaleString("en-PH")}
           </div>
+
+          {alternatives && <Alternatives data={alternatives} />}
         </div>
       )}
     </main>

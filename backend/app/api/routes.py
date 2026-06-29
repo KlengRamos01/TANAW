@@ -3,7 +3,8 @@ from datetime import datetime, date
 from fastapi import APIRouter, HTTPException, Query
 
 from app.data.destinations import TOP_50_DESTINATIONS
-from app.models import Destination, DailyForecast, OverallTripRisk, ForecastResponse, SearchResult
+from app.models import Destination, DailyForecast, OverallTripRisk, ForecastResponse, SearchResult, AlternativesResponse
+from app.services.alternatives import find_alternatives
 from app.services.gemini import generate_summaries
 from app.services.risk import calculate_daily_risk, get_overall_trip_risk, risk_level_to_badge
 from app.services.weather import fetch_forecast, lookup_city
@@ -112,3 +113,37 @@ async def get_destination_forecast(
         data_source="PAGASA / OpenWeatherMap / Gemini",
         generated_at=datetime.utcnow().isoformat() + "Z",
     )
+
+
+@router.get("/alternatives", response_model=AlternativesResponse)
+async def get_alternatives(
+    destination_id: int = Query(..., description="Pre-loaded destination ID"),
+    destination_name: str = Query(None, description="Origin name"),
+    lat: float = Query(None, description="Origin latitude"),
+    lon: float = Query(None, description="Origin longitude"),
+    region: str = Query("", description="Origin region"),
+    start_date: str = Query(None, description="Trip start date (YYYY-MM-DD)"),
+    end_date: str = Query(None, description="Trip end date (YYYY-MM-DD)"),
+):
+    dest_data = next((d for d in TOP_50_DESTINATIONS if d["id"] == destination_id), None)
+    if not dest_data:
+        return AlternativesResponse(
+            origin_id=destination_id,
+            origin_name=destination_name or "",
+            island_group="",
+            alternatives=[],
+            total_green_found=0,
+            requested=3,
+            note="Alternatives are available only for pre-loaded destinations.",
+        )
+
+    result = find_alternatives(
+        destination_id=dest_data["id"],
+        destination_name=dest_data["name"],
+        lat=dest_data["latitude"],
+        lon=dest_data["longitude"],
+        region=dest_data["region"],
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return AlternativesResponse(**result)
