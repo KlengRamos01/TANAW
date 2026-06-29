@@ -7,7 +7,7 @@ import httpx
 
 from app.config import settings
 
-RAPIDAPI_HOST = "open-weather13.p.rapidapi.com"
+OPENWEATHER_BASE = "https://api.openweathermap.org"
 PAGASA_TOURIST_URL = "https://bagong.pagasa.dost.gov.ph/weather/weather-outlook-selected-tourist-areas"
 PAGASA_CITIES_URL = "https://bagong.pagasa.dost.gov.ph/weather/weather-outlook-selected-philippine-cities"
 
@@ -41,23 +41,22 @@ async def lookup_city(name: str) -> dict | None:
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"https://{RAPIDAPI_HOST}/city",
-                params={"city": name, "lang": "EN"},
-                headers={
-                    "x-rapidapi-key": settings.weather_api_key,
-                    "x-rapidapi-host": RAPIDAPI_HOST,
-                },
+                f"{OPENWEATHER_BASE}/geo/1.0/direct",
+                params={"q": name, "limit": 1, "appid": settings.weather_api_key},
                 timeout=10,
             )
             if resp.status_code == 200:
                 data = resp.json()
-                country = data.get("sys", {}).get("country", "")
+                if not data:
+                    return None
+                entry = data[0]
+                country = entry.get("country", "")
                 if country != "PH":
                     return None
                 return {
-                    "name": data.get("name", name),
-                    "lat": data["coord"]["lat"],
-                    "lon": data["coord"]["lon"],
+                    "name": entry.get("name", name),
+                    "lat": entry["lat"],
+                    "lon": entry["lon"],
                     "country": country,
                 }
     except Exception:
@@ -71,11 +70,13 @@ async def _try_openweather(lat: float, lon: float, start_date: str | None, end_d
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"https://{RAPIDAPI_HOST}/fivedaysforcast",
-                params={"latitude": lat, "longitude": lon, "lang": "EN"},
-                headers={
-                    "x-rapidapi-key": settings.weather_api_key,
-                    "x-rapidapi-host": RAPIDAPI_HOST,
+                f"{OPENWEATHER_BASE}/data/2.5/forecast",
+                params={
+                    "lat": lat,
+                    "lon": lon,
+                    "appid": settings.weather_api_key,
+                    "units": "metric",
+                    "lang": "en",
                 },
                 timeout=15,
             )
