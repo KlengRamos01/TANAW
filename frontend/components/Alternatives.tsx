@@ -31,14 +31,14 @@ interface AlternativesData {
 export default function Alternatives({ data }: { data: AlternativesData }) {
   return (
     <div className="mt-10 w-full max-w-4xl">
-      <div className="border-t border-gray-200 pt-8">
-        <h3 className="text-lg font-bold text-gray-900 mb-1">
+      <div className="border-t border-gray-300 pt-8">
+        <h3 className="text-lg font-bold text-gray-800 mb-1">
           {data.alternatives.length > 0
             ? `Travel-safe Destinations in ${data.island_group}`
             : data.note || "No alternatives found"}
         </h3>
         {data.note && data.alternatives.length > 0 && (
-          <p className="text-sm text-gray-500 mb-4">{data.note}</p>
+          <p className="text-sm text-gray-600 mb-4">{data.note}</p>
         )}
         {data.note && data.alternatives.length === 0 && (
           <p className="text-sm text-gray-500">{data.note}</p>

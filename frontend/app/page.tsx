@@ -112,19 +112,19 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-12">
       <div className="text-center mb-10">
-        <h1 className="text-5xl font-bold tracking-tight text-gray-900">TANAW</h1>
-        <p className="text-lg text-gray-500 mt-2">Weather-Aware Destination Planner</p>
-        <p className="text-sm text-gray-400 mt-1">Know before you go.</p>
+        <h1 className="text-5xl font-bold tracking-tight text-gray-800">TANAW</h1>
+        <p className="text-lg text-gray-600 mt-2">Weather-Aware Destination Planner</p>
+        <p className="text-sm text-gray-500 mt-1">Know before you go.</p>
       </div>
 
       <DestinationSearch onSelect={handleSelect} />
 
-      <div className="mt-4 text-xs text-gray-400">
+      <div className="mt-4 text-xs text-gray-500">
         Search a Philippine destination
       </div>
 
       {showDatePicker && selectedDest && !forecast && !loading && (
-        <div className="mt-8 w-full max-w-xl bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="mt-8 w-full max-w-xl bg-white/90 backdrop-blur rounded-xl shadow-sm border border-gray-200 p-6">
           <p className="font-semibold text-gray-900 mb-3">
             When are you visiting {selectedDest.name}?
           </p>
@@ -172,28 +172,17 @@ export default function Home() {
 
       {forecast && (
         <div className="mt-12 w-full max-w-4xl">
-          <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                {forecast.destination.name}
-              </h2>
-              <p className="text-gray-500">
-                {forecast.destination.municipality}
-                {forecast.destination.province ? `, ${forecast.destination.province}` : ""}
-                {forecast.destination.region ? ` · ${forecast.destination.region}` : ""}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                {startDate} to {endDate} · {forecast.forecasts.length} days
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500 mb-1">Trip Risk</p>
-              <RiskBadge level={forecast.overall_trip_risk.level} size="lg" />
-              <p className="text-xs text-gray-500 mt-2 max-w-xs">
-                {forecast.overall_trip_risk.reason}
-              </p>
-            </div>
-          </div>
+          <OverallTripCard
+            destinationName={forecast.destination.name}
+            municipality={forecast.destination.municipality}
+            province={forecast.destination.province}
+            region={forecast.destination.region}
+            startDate={startDate}
+            endDate={endDate}
+            daysCount={forecast.forecasts.length}
+            overallLevel={forecast.overall_trip_risk.level}
+            overallReason={forecast.overall_trip_risk.reason}
+          />
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {forecast.forecasts.map((day) => (
@@ -208,7 +197,7 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="mt-8 text-center text-xs text-gray-400">
+          <div className="mt-8 text-center text-xs text-gray-500">
             Data source: {forecast.data_source} &middot;{" "}
             Generated at{" "}
             {new Date(forecast.generated_at).toLocaleString("en-PH")}
@@ -218,5 +207,101 @@ export default function Home() {
         </div>
       )}
     </main>
+  )
+}
+
+function OverallTripCard({
+  destinationName,
+  municipality,
+  province,
+  region,
+  startDate,
+  endDate,
+  daysCount,
+  overallLevel,
+  overallReason,
+}: {
+  destinationName: string
+  municipality: string
+  province: string
+  region: string
+  startDate: string
+  endDate: string
+  daysCount: number
+  overallLevel: string
+  overallReason: string
+}) {
+  function getOverallWeather(level: string, reason: string): "sunny" | "cloudy" | "rainy" | "stormy" {
+    const text = reason.toLowerCase()
+    if (level === "green") return "sunny"
+    if (text.includes("storm signal")) return "stormy"
+    if (text.includes("thunderstorm")) return "stormy"
+    if (text.includes("heavy rain") || text.includes("heavy rainfall")) return "rainy"
+    if (text.includes("rain") || text.includes("flood")) return "rainy"
+    if (text.includes("cloud") || text.includes("scattered")) return "cloudy"
+    if (level === "red") return "rainy"
+    if (level === "yellow") return "cloudy"
+    return "sunny"
+  }
+
+  const weather = getOverallWeather(overallLevel, overallReason)
+
+  const styles: Record<string, { bg: string; text: string }> = {
+    sunny: { bg: "bg-amber-50 border-amber-200", text: "text-amber-900" },
+    cloudy: { bg: "bg-gray-200 border-gray-300", text: "text-gray-800" },
+    rainy: { bg: "bg-blue-900 border-blue-800", text: "text-blue-50" },
+    stormy: { bg: "bg-gray-900 border-gray-700", text: "text-gray-100" },
+  }
+
+  const s = styles[weather]
+
+  const icons: Record<string, JSX.Element> = {
+    sunny: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10 text-amber-500" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="5" />
+        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round" />
+      </svg>
+    ),
+    cloudy: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10 text-gray-500" stroke="currentColor" strokeWidth="1.5">
+        <path d="M6.5 14A4.5 4.5 0 1 0 6.5 5a5.5 5.5 0 0 0-.5 9M4 14a4 4 0 0 0 4 4h8.5a3.5 3.5 0 1 0-.5-6.97" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    rainy: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10 text-blue-300" stroke="currentColor" strokeWidth="1.5">
+        <path d="M6.5 12A4.5 4.5 0 1 0 6.5 3a5.5 5.5 0 0 0-.5 9M4 12a4 4 0 0 0 4 4h8.5a3.5 3.5 0 1 0-.5-6.97" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M10 17l-1 3M14 17l-1 3M8 19l-1 2M16 19l-1 2" strokeLinecap="round" />
+      </svg>
+    ),
+    stormy: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10 text-yellow-400" stroke="currentColor" strokeWidth="1.5">
+        <path d="M6.5 12A4.5 4.5 0 1 0 6.5 3a5.5 5.5 0 0 0-.5 9M4 12a4 4 0 0 0 4 4h8.5a3.5 3.5 0 1 0-.5-6.97" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12 15l-2 4h3l-1.5 4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  }
+
+  return (
+    <div className={`rounded-xl border p-6 flex flex-col sm:flex-row items-start justify-between gap-4 shadow-sm hover:shadow-md transition-shadow mb-8 ${s.bg}`}>
+      <div className="flex items-start gap-4">
+        {icons[weather]}
+        <div>
+          <h2 className={`text-2xl font-bold ${s.text}`}>{destinationName}</h2>
+          <p className={`text-sm opacity-70 ${s.text}`}>
+            {municipality}{province ? `, ${province}` : ""}{region ? ` · ${region}` : ""}
+          </p>
+          <p className={`text-xs opacity-50 mt-1 ${s.text}`}>
+            {startDate} to {endDate} · {daysCount} days
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <span className={`text-xs font-medium uppercase tracking-wider opacity-60 ${s.text}`}>
+          {weather === "sunny" ? "All Clear" : weather === "cloudy" ? "Caution" : weather === "rainy" ? "Heads Up" : "Avoid"}
+        </span>
+        <RiskBadge level={overallLevel} size="lg" />
+        <p className={`text-xs mt-1 max-w-xs text-right opacity-70 ${s.text}`}>{overallReason}</p>
+      </div>
+    </div>
   )
 }

@@ -13,7 +13,7 @@ TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives 
 ## Tech Stack
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14 + Tailwind CSS |
+| Frontend | Next.js 14 + Tailwind CSS + Inter font |
 | AI / LLM | Google Gemini API (via google-generativeai) |
 | Backend | Python 3.12+ (FastAPI, Uvicorn) |
 | Testing | pytest (193 tests) |
@@ -153,8 +153,9 @@ Invalid inputs return **400 Bad Request** with a descriptive error message.
 ## Feature 1 — 7-Day Destination Search
 
 - Search any of 50 pre-loaded Philippine tourist destinations
-- Returns 7-day forecast cards with plain-language summaries (via Gemini)
+- Returns 7-day forecast cards with plain-language summaries (via Gemini), weather-condition-themed backgrounds (amber for sunny, gray for cloudy, navy for rainy), and SVG weather icons
 - Three-tier risk badges: green (safe), yellow (caution), red (avoid)
+- Overall trip risk card styled to match individual forecast cards with the same color/icon system
 - Data source + timestamp disclosed on every forecast
 
 ## Feature 2 — Travel-safe Destinations

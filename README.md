@@ -6,7 +6,7 @@ Travelers and residents across the Philippines lack a single tool that turns mul
 
 ## Core Features
 
-1. **Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a day-by-day forecast in conversational Filipino/English, generated from OpenWeatherMap and PAGASA data via Gemini API.
+1. **Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a day-by-day forecast in conversational Filipino/English, generated from OpenWeatherMap and PAGASA data via Gemini API. Forecast cards have weather-condition-themed backgrounds (amber for sunny, gray for cloudy, navy for rainy) with matching SVG icons. The overall trip risk card matches the same visual style. Search bar includes a clear button and Enter-to-submit support.
 
 2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — Each destination gets a color-coded badge for the selected date range, calculated from a defined ruleset (PAGASA storm signal thresholds, rainfall, wind speed, sea conditions).
 
