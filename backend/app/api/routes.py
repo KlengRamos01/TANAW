@@ -79,18 +79,25 @@ async def get_destination_forecast(
             destination = Destination(**dest_data)
 
     if not destination and dest_name_safe:
-        city = await lookup_city(dest_name_safe)
-        if city:
-            destination = Destination(
-                id=_next_id(),
-                name=sanitize_string(city["name"]),
-                municipality=sanitize_string(city["name"]),
-                province=sanitize_string(city.get("country", "")),
-                region="",
-                latitude=city["lat"],
-                longitude=city["lon"],
-                category="city",
-            )
+        dest_data = next(
+            (d for d in TOP_50_DESTINATIONS if d["name"].lower() == dest_name_safe.lower()),
+            None,
+        )
+        if dest_data:
+            destination = Destination(**dest_data)
+        else:
+            city = await lookup_city(dest_name_safe)
+            if city:
+                destination = Destination(
+                    id=_next_id(),
+                    name=sanitize_string(city["name"]),
+                    municipality=sanitize_string(city["name"]),
+                    province=sanitize_string(city.get("country", "")),
+                    region="",
+                    latitude=city["lat"],
+                    longitude=city["lon"],
+                    category="city",
+                )
 
     if not destination:
         raise HTTPException(status_code=404, detail="Destination not found. Try searching a different name.")
