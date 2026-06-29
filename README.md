@@ -6,7 +6,7 @@ Travelers and residents across the Philippines lack a single tool that turns mul
 
 ## Core Features
 
-1. **Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a day-by-day forecast in conversational Filipino/English, generated from PAGASA data and OpenWeatherMap via Gemini API.
+1. **Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a day-by-day forecast in conversational Filipino/English, generated from OpenWeatherMap and PAGASA data via Gemini API.
 
 2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — Each destination gets a color-coded badge for the selected date range, calculated from a defined ruleset (PAGASA storm signal thresholds, rainfall, wind speed, sea conditions).
 
@@ -14,12 +14,11 @@ Travelers and residents across the Philippines lack a single tool that turns mul
 
 4. **[NOT INCLUDED IN V1] Saved Trip Alerts with Risk-Change Notifications** — User saves a trip by entering a destination and date range. The app sends a push notification when the risk badge changes tier before the trip.
 
-5. **Data Source and Timestamp Disclosure on Every Forecast** — Every forecast card displays the specific data source (OpenWeatherMap / PAGASA / Gemini) and a last-updated timestamp.
+5. **Data Source and Timestamp Disclosure on Every Forecast** — Every forecast card displays the specific data source (OpenWeatherMap / PAGASA / Gemini) and a last-updated timestamp (`generated_at`).
 
 ## Data Pipeline
 
 | Priority | Source | Method |
 |----------|--------|--------|
-| Primary | OpenWeatherMap | RapidAPI (requires `WEATHER_API_KEY`) |
+| Primary | OpenWeatherMap | RapidAPI `/fivedaysforcast` endpoint by lat/lon (requires `WEATHER_API_KEY`) |
 | Secondary | PAGASA | Website scrape of `bagong.pagasa.dost.gov.ph` tourist/city forecasts using BeautifulSoup |
-| Fallback | Mock data | Deterministic random seed when no API keys or scrape available |

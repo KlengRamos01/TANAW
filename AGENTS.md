@@ -110,8 +110,8 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 
 **Note:** The app requires at least one data source to work. To use real data:
 - `GEMINI_API_KEY` — Google Gemini API key for plain-language summaries
-- `WEATHER_API_KEY` — OpenWeatherMap API key (primary weather source)
-- `PAGASA_API_KEY` — PAGASA API key (secondary/fallback; not required for website scrape)
+- `WEATHER_API_KEY` — OpenWeatherMap API key (primary weather source via RapidAPI `/fivedaysforcast`)
+- `PAGASA_API_KEY` — not required; PAGASA data is scraped from `bagong.pagasa.dost.gov.ph`
 
 ## API Endpoints
 
@@ -119,13 +119,13 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | GET | `/api/destinations/search?query=` | Search destinations (top 50) |
-| GET | `/api/forecast/{destination_id}` | Get 7-day forecast |
+| GET | `/api/forecast?destination_id=&destination_name=&start_date=&end_date=` | Get 7-day forecast |
 | GET | `/api/alternatives?destination_id=&start_date=&end_date=` | Get 3 closest Green/Yellow alternatives |
 
 ## Feature 1 — 7-Day Destination Search
 
 - Search any of 50 pre-loaded Philippine tourist destinations
-- Returns 7-day forecast cards with plain-language summaries (via Gemini or fallback)
+- Returns 7-day forecast cards with plain-language summaries (via Gemini)
 - Three-tier risk badges: green (safe), yellow (caution), red (avoid)
 - Data source + timestamp disclosed on every forecast
 
