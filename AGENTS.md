@@ -4,20 +4,20 @@
 TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives Filipinos clear, location-specific weather forecasts for the days ahead. It tells them which destinations to avoid due to storms or unsafe conditions and recommends nearby places with better weather instead.
 
 ## Core Features
-1. ** Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a forecast in conversational Filipino/English.
-2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — At-a-glance safety rating per destination per day.
-3. **Alternative Destination Suggestions (Same Region, Better Forecast)** — AI-recommended nearby alternatives when a destination has poor weather.
-4. **NOT INCLUDED IN V1-Saved Trip Alerts with Risk-Change Notifications** — Monitor saved trips and get notified when the risk level changes.
-5. **Data Source and Timestamp Disclosure on Every Forecast** — Transparent data provenance on all weather data shown.
+1. **Destination Search with Plain-Language Daily Breakdown** — Search any PH destination and get a forecast in conversational Filipino/English. ✅
+2. **Three-Tier Destination Risk Badge (Red / Yellow / Green)** — At-a-glance safety rating per destination per day. ✅
+3. **Alternative Destination Suggestions (Same Island Group, Better Forecast)** — Up to 3 nearby Green-rated alternatives when a destination has Red/Yellow overall risk. ✅
+4. **Saved Trip Alerts with Risk-Change Notifications** — ❌ NOT INCLUDED IN V1
+5. **Data Source and Timestamp Disclosure on Every Forecast** — Transparent data provenance on all weather data shown. ✅
 
 ## Tech Stack
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 14 + Tailwind CSS |
 | AI / LLM | Google Gemini API (via google-generativeai) |
-| Backend | Python (FastAPI) |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase Auth |
+| Backend | Python 3.12+ (FastAPI, Uvicorn) |
+| Testing | pytest |
+| Data Sources | PAGASA storm signal ruleset (hardcoded), mock weather (fallback), OpenWeatherMap API (optional) |
 | Deploy | Vercel (frontend) + GitHub Actions (backend CI/CD) |
 
 ## Architecture
@@ -55,10 +55,15 @@ TANAW/
 │       ├── data/
 │       │   ├── __init__.py
 │       │   └── destinations.py
-│       └── services/
+│       ├── services/
+│       │   ├── __init__.py
+│       │   ├── alternatives.py
+│       │   ├── gemini.py
+│       │   ├── risk.py
+│       │   └── weather.py
+│       └── tests/
 │           ├── __init__.py
-│           ├── weather.py
-│           └── gemini.py
+│           └── test_risk.py
 ├── frontend/              # Next.js 14 application
 │   ├── package.json
 │   ├── next.config.js
@@ -69,6 +74,7 @@ TANAW/
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   └── components/
+│       ├── Alternatives.tsx
 │       ├── DestinationSearch.tsx
 │       ├── ForecastCard.tsx
 │       └── RiskBadge.tsx
@@ -113,6 +119,7 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 | GET | `/health` | Health check |
 | GET | `/api/destinations/search?query=` | Search destinations (top 50) |
 | GET | `/api/forecast/{destination_id}` | Get 7-day forecast |
+| GET | `/api/alternatives?destination_id=&start_date=&end_date=` | Get 3 closest Green alternatives |
 
 ## Feature 1 — 7-Day Destination Search
 
