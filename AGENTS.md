@@ -126,6 +126,13 @@ Copy `.env.example` to `.env` and fill in the required API keys.
 - `WEATHER_API_KEY` — OpenWeatherMap API key (primary weather source via RapidAPI `/fivedaysforcast`)
 - `PAGASA_API_KEY` — not required; PAGASA data is scraped from `bagong.pagasa.dost.gov.ph`
 
+### Deploy (Frontend — Vercel)
+
+1. Push to GitHub
+2. Import repo at [vercel.com](https://vercel.com)
+3. Set root directory to `frontend/`
+4. Add environment variable `NEXT_PUBLIC_API_URL` pointing to your deployed backend URL
+
 ## API Endpoints
 
 | Method | Path | Description |

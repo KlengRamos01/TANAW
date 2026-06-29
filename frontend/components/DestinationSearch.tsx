@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 interface Destination {
   id: number
   name: string
@@ -43,7 +45,7 @@ export default function DestinationSearch({
 
     setLoading(true)
     try {
-      const res = await fetch(`http://localhost:8000/api/destinations/search?query=${encodeURIComponent(value)}`)
+      const res = await fetch(`${API_URL}/api/destinations/search?query=${encodeURIComponent(value)}`)
       const data = await res.json()
       setResults(data.destinations || [])
     } catch {

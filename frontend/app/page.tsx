@@ -6,6 +6,8 @@ import DestinationSearch from "../components/DestinationSearch"
 import ForecastCard from "../components/ForecastCard"
 import RiskBadge from "../components/RiskBadge"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 interface Destination {
   id: number
   name: string
@@ -84,7 +86,7 @@ export default function Home() {
         params.set("destination_name", selectedDest.name)
       }
 
-      const res = await fetch(`http://localhost:8000/api/forecast?${params}`)
+      const res = await fetch(`${API_URL}/api/forecast?${params}`)
       if (!res.ok) throw new Error("Failed to load forecast")
       const data: ForecastResponse = await res.json()
       setForecast(data)
@@ -95,7 +97,7 @@ export default function Home() {
         altParams.set("start_date", startDate)
         altParams.set("end_date", endDate)
         altParams.set("region", selectedDest.region)
-        const altRes = await fetch(`http://localhost:8000/api/alternatives?${altParams}`)
+        const altRes = await fetch(`${API_URL}/api/alternatives?${altParams}`)
         if (altRes.ok) {
           setAlternatives(await altRes.json())
         }
