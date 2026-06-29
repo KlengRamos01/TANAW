@@ -94,10 +94,12 @@ def find_alternatives(
     for dist, c in top:
         from app.models import AlternativeDestination
 
+        risk = _candidate_risk(c, start_date, end_date)
         alternatives.append(AlternativeDestination(
             destination=Destination(**c),
             distance_km=dist,
             travel_time_estimate=_travel_time_estimate(dist),
+            risk_level=risk,
         ))
 
     note = None

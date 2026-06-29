@@ -16,6 +16,7 @@ class AlternativeDestination(BaseModel):
     destination: Destination
     distance_km: float
     travel_time_estimate: str
+    risk_level: str
 
 
 class AlternativesResponse(BaseModel):

@@ -15,6 +15,7 @@ interface Alternative {
   destination: AlternativeDest
   distance_km: number
   travel_time_estimate: string
+  risk_level: string
 }
 
 interface AlternativesData {
@@ -33,7 +34,7 @@ export default function Alternatives({ data }: { data: AlternativesData }) {
       <div className="border-t border-gray-200 pt-8">
         <h3 className="text-lg font-bold text-gray-900 mb-1">
           {data.alternatives.length > 0
-            ? `Green-rated alternatives in ${data.island_group}`
+            ? `Travel-safe Destinations in ${data.island_group}`
             : data.note || "No alternatives found"}
         </h3>
         {data.note && data.alternatives.length > 0 && (
@@ -48,7 +49,7 @@ export default function Alternatives({ data }: { data: AlternativesData }) {
             {data.alternatives.map((alt) => (
               <div
                 key={alt.destination.id}
-                className="bg-green-50 border border-green-200 rounded-xl p-5 flex flex-col gap-2"
+                className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-2"
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -58,7 +59,7 @@ export default function Alternatives({ data }: { data: AlternativesData }) {
                       {alt.destination.province}
                     </p>
                   </div>
-                  <RiskBadge level="green" />
+                  <RiskBadge level={alt.risk_level} />
                 </div>
                 <div className="flex gap-3 text-xs text-gray-500">
                   <span>{alt.distance_km} km</span>
