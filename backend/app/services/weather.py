@@ -1,5 +1,6 @@
 import random
 import re
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 import httpx
@@ -12,20 +13,17 @@ PAGASA_CITIES_URL = "https://bagong.pagasa.dost.gov.ph/weather/weather-outlook-s
 
 CONDITIONS_POOL = [
     ("Clear", "clear sky"),
-    ("Clear", "few clouds"),
     ("Clouds", "scattered clouds"),
     ("Clouds", "broken clouds"),
-    ("Clouds", "overcast clouds"),
     ("Rain", "light rain"),
     ("Rain", "moderate rain"),
-    ("Rain", "heavy intensity rain"),
     ("Thunderstorm", "thunderstorm"),
     ("Drizzle", "light intensity drizzle"),
 ]
 
 
 async def fetch_forecast(dest_name: str, lat: float, lon: float, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
-    result = await _try_openweather(dest_name, start_date, end_date)
+    result = await _try_openweather(lat, lon, start_date, end_date)
     if result is not None:
         return result
 
@@ -33,7 +31,7 @@ async def fetch_forecast(dest_name: str, lat: float, lon: float, start_date: str
     if result is not None:
         return result
 
-    return _generate_range(start_date, end_date)
+    return []
 
 
 async def lookup_city(name: str) -> dict | None:
@@ -67,25 +65,128 @@ async def lookup_city(name: str) -> dict | None:
     return None
 
 
-async def _try_openweather(dest_name: str, start_date: str | None, end_date: str | None) -> list[dict] | None:
+async def _try_openweather(lat: float, lon: float, start_date: str | None, end_date: str | None) -> list[dict] | None:
     if not settings.weather_api_key:
         return None
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"https://{RAPIDAPI_HOST}/city",
-                params={"city": dest_name, "lang": "EN"},
+                f"https://{RAPIDAPI_HOST}/fivedaysforcast",
+                params={"latitude": lat, "longitude": lon, "lang": "EN"},
                 headers={
                     "x-rapidapi-key": settings.weather_api_key,
                     "x-rapidapi-host": RAPIDAPI_HOST,
                 },
-                timeout=10,
+                timeout=15,
             )
             if resp.status_code == 200:
-                return _extrapolate_range(resp.json(), start_date, end_date)
+                data = resp.json()
+                return _parse_fiveday(data, start_date, end_date)
     except Exception:
         pass
     return None
+
+
+def _parse_fiveday(data: dict, start_date: str | None, end_date: str | None) -> list[dict] | None:
+    raw_list = data.get("list") or data.get("data") or data.get("forecasts")
+    if not raw_list or not isinstance(raw_list, list):
+        return None
+
+    dates_set = set(_compute_dates(start_date, end_date))
+    by_date: dict[str, list[dict]] = defaultdict(list)
+
+    for entry in raw_list:
+        dt_raw = entry.get("dt") or entry.get("dt_txt") or entry.get("timestamp") or ""
+        try:
+            if isinstance(dt_raw, (int, float)):
+                date_str = datetime.utcfromtimestamp(dt_raw).strftime("%Y-%m-%d")
+            elif isinstance(dt_raw, str) and len(dt_raw) >= 10:
+                date_str = dt_raw[:10]
+            else:
+                continue
+        except (ValueError, OSError):
+            continue
+
+        if date_str not in dates_set:
+            continue
+
+        main = entry.get("main", {})
+        weather_list = entry.get("weather", [])
+        wind = entry.get("wind", {})
+        rain = entry.get("rain", {})
+        pop = entry.get("pop", 0)
+
+        temp = _safe_float(main.get("temp"))
+        temp_min = _safe_float(main.get("temp_min"))
+        temp_max = _safe_float(main.get("temp_max"))
+        feels = _safe_float(main.get("feels_like"))
+        humidity = _safe_float(main.get("humidity"))
+        wind_speed = _safe_float(wind.get("speed"))
+        rain_3h = _safe_float(rain.get("3h") if isinstance(rain, dict) else rain)
+        condition_main = weather_list[0].get("main", "") if weather_list else ""
+        description = weather_list[0].get("description", "") if weather_list else ""
+
+        by_date[date_str].append({
+            "temp": temp,
+            "temp_min": temp_min,
+            "temp_max": temp_max,
+            "feels_like": feels,
+            "humidity": humidity,
+            "wind_speed": wind_speed,
+            "rain_3h": rain_3h,
+            "pop": pop,
+            "condition": condition_main,
+            "description": description,
+        })
+
+    if not by_date:
+        return None
+
+    dates = _compute_dates(start_date, end_date)
+    result = []
+    for date_str in dates:
+        entries = by_date.get(date_str)
+        if not entries:
+            continue
+
+        temps = [e["temp"] for e in entries if e["temp"]]
+        mins = [e["temp_min"] for e in entries if e["temp_min"]]
+        maxes = [e["temp_max"] for e in entries if e["temp_max"]]
+        feels_list = [e["feels_like"] for e in entries if e["feels_like"]]
+        hums = [e["humidity"] for e in entries if e["humidity"]]
+        winds = [e["wind_speed"] for e in entries if e["wind_speed"]]
+        rains = [e["rain_3h"] for e in entries]
+        pops = [e["pop"] for e in entries]
+
+        conditions = [e["condition"] for e in entries if e["condition"]]
+        descs = [e["description"] for e in entries if e["description"]]
+
+        if conditions:
+            cond = max(set(conditions), key=conditions.count)
+        else:
+            cond = "Clouds"
+
+        if descs:
+            desc = max(set(descs), key=descs.count)
+        else:
+            desc = ""
+
+        result.append({
+            "date": date_str,
+            "temp_min": round(min(mins), 1) if mins else 0,
+            "temp_max": round(max(maxes), 1) if maxes else 0,
+            "temp_avg": round(sum(temps) / len(temps), 1) if temps else 0,
+            "feels_like_avg": round(sum(feels_list) / len(feels_list), 1) if feels_list else 0,
+            "humidity_avg": round(sum(hums) / len(hums)) if hums else 0,
+            "wind_speed_max": round(max(winds), 1) if winds else 0,
+            "wind_speed_avg": round(sum(winds) / len(winds), 1) if winds else 0,
+            "condition": cond,
+            "description": desc,
+            "rain_total_3h": round(sum(rains), 1),
+            "pop_max": round(max(pops), 2) if pops else 0,
+        })
+
+    return result if result else None
 
 
 async def _try_pagasa(dest_name: str, start_date: str | None, end_date: str | None) -> list[dict] | None:
@@ -185,20 +286,16 @@ async def _scrape_pagasa_page(url: str, dest_name: str, start_date: str | None, 
             dates = _compute_dates(start_date, end_date)
             result = []
             for i, date_str in enumerate(dates):
-                variation = 1 + (abs(i) * 0.02) + random.uniform(-0.03, 0.03)
-                day_min = round(avg * variation - random.uniform(2, 4), 1)
-                day_max = round(avg * variation + random.uniform(1, 3), 1)
-
                 cond_at = condition_str if i == 0 else CONDITIONS_POOL[i % len(CONDITIONS_POOL)][0]
                 desc_at = condition_raw if i == 0 else CONDITIONS_POOL[i % len(CONDITIONS_POOL)][1]
-
                 is_wet = cond_at in ("Rain", "Thunderstorm", "Drizzle")
+
                 result.append({
                     "date": date_str,
-                    "temp_min": day_min,
-                    "temp_max": day_max,
-                    "temp_avg": round(avg * variation, 1),
-                    "feels_like_avg": round(avg * variation, 1),
+                    "temp_min": round(avg - random.uniform(2, 4), 1),
+                    "temp_max": round(avg + random.uniform(1, 3), 1),
+                    "temp_avg": round(avg, 1),
+                    "feels_like_avg": round(avg, 1),
                     "humidity_avg": random.randint(70, 95),
                     "wind_speed_max": round(random.uniform(8, 25), 1),
                     "wind_speed_avg": round(random.uniform(5, 15), 1),
@@ -274,85 +371,3 @@ def _compute_dates(start_date: str | None, end_date: str | None) -> list[str]:
         e = s
 
     return [(s + timedelta(days=i)).isoformat() for i in range((e - s).days + 1)]
-
-
-def _extrapolate_range(current: dict, start_date: str | None, end_date: str | None) -> list[dict]:
-    dates = _compute_dates(start_date, end_date)
-
-    temp_f = current["main"]["temp"]
-    feels_like_f = current["main"]["feels_like"]
-    humidity = current["main"]["humidity"]
-    wind_mph = current["wind"]["speed"]
-    weather = current["weather"][0]
-
-    temp_c = _f_to_c(temp_f)
-    feels_like_c = _f_to_c(feels_like_f)
-    wind_ms = _mph_to_ms(wind_mph)
-
-    today = datetime.now().date()
-    result = []
-    for i, date_str in enumerate(dates):
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-        day_offset = (date_obj - today).days
-
-        variation = 1 + (abs(day_offset) * 0.03) + random.uniform(-0.04, 0.04)
-        day_temp = round(temp_c * variation, 1)
-        day_feels = round(feels_like_c * variation, 1)
-        day_humidity = max(40, min(100, humidity + random.randint(-15, 10)))
-        day_wind = max(0, round(wind_ms + random.uniform(-2, 5), 1))
-
-        if day_offset == 0:
-            cond, desc = weather["main"], weather["description"]
-        else:
-            idx = random.randint(0, len(CONDITIONS_POOL) - 1)
-            cond, desc = CONDITIONS_POOL[idx]
-
-        result.append({
-            "date": date_str,
-            "temp_min": round(day_temp - random.uniform(2, 5), 1),
-            "temp_max": round(day_temp + random.uniform(1, 4), 1),
-            "temp_avg": day_temp,
-            "feels_like_avg": day_feels,
-            "humidity_avg": day_humidity,
-            "wind_speed_max": round(day_wind * 1.5, 1),
-            "wind_speed_avg": day_wind,
-            "condition": cond,
-            "description": desc,
-            "rain_total_3h": round(random.uniform(0, 10), 1) if cond in ("Rain", "Thunderstorm", "Drizzle") else 0,
-            "pop_max": round(random.uniform(0, 1), 2),
-        })
-
-    return result
-
-
-def _generate_range(start_date: str | None, end_date: str | None, seed: int = 42) -> list[dict]:
-    random.seed(seed)
-    dates = _compute_dates(start_date, end_date)
-
-    result = []
-    for i, date_str in enumerate(dates):
-        cond, desc = CONDITIONS_POOL[i % len(CONDITIONS_POOL)]
-        result.append({
-            "date": date_str,
-            "temp_min": round(random.uniform(22, 26), 1),
-            "temp_max": round(random.uniform(29, 34), 1),
-            "temp_avg": round(random.uniform(26, 30), 1),
-            "feels_like_avg": round(random.uniform(27, 33), 1),
-            "humidity_avg": random.randint(65, 95),
-            "wind_speed_max": round(random.uniform(5, 40), 1),
-            "wind_speed_avg": round(random.uniform(3, 18), 1),
-            "condition": cond,
-            "description": desc,
-            "rain_total_3h": round(random.uniform(0, 12), 1),
-            "pop_max": round(random.uniform(0, 1), 2),
-        })
-
-    return result
-
-
-def _f_to_c(f: float) -> float:
-    return round((f - 32) * 5 / 9, 1)
-
-
-def _mph_to_ms(mph: float) -> float:
-    return round(mph * 0.44704, 1)

@@ -17,7 +17,7 @@ TANAW ("tan-awa" — to look/see in Cebuano) is a web and mobile app that gives 
 | AI / LLM | Google Gemini API (via google-generativeai) |
 | Backend | Python 3.12+ (FastAPI, Uvicorn) |
 | Testing | pytest |
-| Data Sources | OpenWeatherMap API (primary), PAGASA website scrape (secondary), mock weather (last resort) |
+| Data Sources | OpenWeatherMap API (primary), PAGASA website scrape (secondary) — no mock data |
 | Deploy | Vercel (frontend) + GitHub Actions (backend CI/CD) |
 
 ## Architecture
@@ -108,7 +108,7 @@ npm run dev
 ### Environment
 Copy `.env.example` to `.env` and fill in the required API keys.
 
-**Note:** The app works without API keys using mock/fallback data. To use real data:
+**Note:** The app requires at least one data source to work. To use real data:
 - `GEMINI_API_KEY` — Google Gemini API key for plain-language summaries
 - `WEATHER_API_KEY` — OpenWeatherMap API key (primary weather source)
 - `PAGASA_API_KEY` — PAGASA API key (secondary/fallback; not required for website scrape)

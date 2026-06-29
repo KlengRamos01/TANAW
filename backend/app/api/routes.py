@@ -65,6 +65,9 @@ async def get_destination_forecast(
 
     daily_weather = await fetch_forecast(destination.name, destination.latitude, destination.longitude, start_date, end_date)
 
+    if not daily_weather:
+        raise HTTPException(status_code=503, detail="Weather data unavailable from all sources. Try again later.")
+
     enriched = []
     for dw in daily_weather:
         dw["category"] = destination.category
@@ -110,7 +113,7 @@ async def get_destination_forecast(
             **risk_level_to_badge(overall_level),
             reason=overall_reason,
         ),
-        data_source="OpenWeatherMap / PAGASA (scraped) / Gemini",
+        data_source="OpenWeatherMap / PAGASA / Gemini",
         generated_at=datetime.utcnow().isoformat() + "Z",
     )
 
